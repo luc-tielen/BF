@@ -38,7 +38,7 @@ loop = do
   return $ Loop instructions
 
 instruction :: Parser Instruction
-instruction = lexeme
+instruction =  lexeme
             $  incrementPtr
            <|> decrementPtr
            <|> incrementValue
