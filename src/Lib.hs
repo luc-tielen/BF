@@ -1,6 +1,6 @@
-module Lib
-    ( someFunc
-    ) where
+module Lib ( parse
+           , interpret
+           ) where
 
-someFunc :: IO ()
-someFunc = putStrLn "someFunc"
+import BF.Parser
+import BF.Interpreter
