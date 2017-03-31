@@ -38,8 +38,7 @@ loop = do
   return $ Loop instructions
 
 instruction :: Parser Instruction
-instruction =  lexeme
-            $  incrementPtr
+instruction =  incrementPtr
            <|> decrementPtr
            <|> incrementValue
            <|> decrementValue
@@ -50,15 +49,3 @@ instruction =  lexeme
 parse :: Parser [Instruction]
 parse = many instruction
 
-
--- Helper functions:
-
--- Anything not parsed by above parser is considered 'whitespace'
-whitespace :: (Token s ~ Char, Text.Megaparsec.Prim.MonadParsec e s m) => m ()
-whitespace = L.space spaceParser commentParser blockCommentParser
-  where spaceParser = noneOf "><+-.,[]" >> return ()
-        commentParser = empty
-        blockCommentParser = empty
-
-lexeme :: (Token s ~ Char, Text.Megaparsec.Prim.MonadParsec e s m) => m a -> m a
-lexeme = L.lexeme whitespace
