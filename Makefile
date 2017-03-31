@@ -1,12 +1,14 @@
 
+EXECUTABLE=$(shell find -type f | grep BF-exe | tail -1)
+
 build:
 	stack build
 
 clean:
 	stack clean
 
-test:
-	stack test
+test: build
+	${EXECUTABLE} ./test/fixtures/test.bf
 
-.PHONY: build clean test
+.PHONY: build clean test run
 
