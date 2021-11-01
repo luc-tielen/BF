@@ -1,14 +1,23 @@
 # For more information, see: https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md
 
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
-resolver: lts-8.6
+resolver:
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/16/23.yaml
 
 # Local packages, usually specified by relative directory name
 packages:
 - '.'
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
-extra-deps: []
+extra-deps:
+- megaparsec-9.0.1@sha256:2244ab77521a52a0083966c5405b3151f149e1db50b1a5b104cd9b1e56617203,3248
+- git: https://github.com/luc-tielen/llvm-hs
+  commit: 69ae96c9eea8531c750c9d81f9813286ef5ced81  # llvm-9, with first terminator fix
+  subdirs:
+    - llvm-hs
+    - llvm-hs-pure
+- git: https://github.com/luc-tielen/llvm-hs-pretty
+  commit: b0e8a13ee087f0d16fc3f70a6f208467ed13023f  # builds with later llvm-hs versions (>9)
 
 # Override default flag values for local packages and extra-deps
 flags: {}
