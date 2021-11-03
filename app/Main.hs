@@ -16,7 +16,7 @@ handleArgs (filename:_) = do
   programString <- TIO.readFile filename
   case P.parse parse filename programString of
     Left e -> print e
-    Right instructions -> interpret instructions
+    Right instructions -> compile instructions  -- for interpreter: interpret instructions
 handleArgs _ = do
   progName <- getProgName
   print $ "Usage: " ++ progName ++ " FILENAME"
