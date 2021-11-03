@@ -20,17 +20,18 @@ import LLVM.CodeModel as C
 import Data.Foldable
 
 
-data Externals
-  = Externals
-  { extPutChar :: Operand
-  , extGetChar :: Operand
+-- Each of these resemble an external function to interact with outside world
+data Runtime
+  = Runtime
+  { rtPutChar :: Operand
+  , rtGetChar :: Operand
   }
 
 data CompilerState
   = CompilerState
   { memory :: Operand
   , index :: Operand
-  , externals :: Externals
+  , runtime :: Runtime
   }
 
 type CodegenM = ReaderT CompilerState (IRBuilderT ModuleBuilder)
@@ -54,15 +55,15 @@ compileModule prog = do
   memset <- extern "llvm.memset.p0i8.i64" [ptr i8, i8, i64, i1] void
   putchar <- extern "putchar" [i32] i32
   getchar <- extern "getchar" [] i32
-  let exts = Externals putchar getchar
+  let exts = Runtime putchar getchar
 
   function "main" [(i32, "argc"), (ptr (ptr i8), "argv")] i32 $ \[argc, argv] -> mdo
     let byteCount = 30000 * 4
     memory <- call malloc [(int32 byteCount, [])]
     call memset [(memory, []), (int8 0, []), (int64 byteCount, []), (bit 0, [])]
+
     array <- memory `bitcast` ptr i32
     idx <- allocate i32 (int32 0)
-
     runReaderT (compileInstructions prog) $ CompilerState array idx exts
 
     call free [(memory, [])]
@@ -70,72 +71,48 @@ compileModule prog = do
 
   pure ()
 
--- TODO: refactor even more
 compileInstructions :: [Instruction] -> CodegenM ()
 compileInstructions = traverse_ compileInstruction where
   compileInstruction = \case
     Loop insts -> do
       let isNonZero = do
-            value <- readArray
+            value <- readValue
             icmp NE value (int32 0)
 
       whileLoop isNonZero $
         compileInstructions insts
+    IncrementValue -> modifyValue increment
+    DecrementValue -> modifyValue decrement
     IncrementPtr -> modifyIndex increment
     DecrementPtr -> modifyIndex decrement
-    IncrementValue -> modifyArray increment
-    DecrementValue -> modifyArray decrement
     ReadInput -> do
-      getChar <- asks (extGetChar . externals)
+      getChar <- asks (rtGetChar . runtime)
       char <- call getChar []
-      modifyArray (const $ pure char)
+      writeValue char
     WriteOutput -> do
-      putChar <- asks (extPutChar . externals)
-      value <- readArray
+      putChar <- asks (rtPutChar . runtime)
+      value <- readValue
       call putChar [(value, [])]
       pure ()
   increment = add (int32 1)
   decrement = (`sub` int32 1)
 
-modifyIndex :: (Operand -> CodegenM Operand) -> CodegenM ()
-modifyIndex f = do
-  idxPtr <- asks index
-  idx <- load idxPtr 0  -- TODO use load'
-  idx' <- f idx
-  store idxPtr 0 idx'  -- TODO use store'
-
-modifyArray :: (Operand -> CodegenM Operand) -> CodegenM ()
-modifyArray f = do
-  CompilerState array idxPtr _ <- ask
-  idx <- load idxPtr 0  -- TODO use load'
-  valuePtr <- gep array [idx]
-  value <- load valuePtr 0
-  value' <- f value
-  store valuePtr 0 value'  -- TODO use store'
-
-readArray :: CodegenM Operand
-readArray = do
-  CompilerState array idxPtr externals <- ask
-  idx <- load idxPtr 0  -- TODO use load'
-  valuePtr <- gep array [idx]
-  load valuePtr 0  -- TODO use load'
-
-writeArray :: Operand -> CodegenM ()
-writeArray value = modifyArray (const $ pure value)
-
--- TODO: update combinator
-
-allocate :: Type -> Operand -> IRBuilderT ModuleBuilder Operand
+allocate :: MonadIRBuilder m => Type -> Operand -> m Operand
 allocate ty value = do
   addr <- alloca ty (Just (int32 1)) 0
   store' addr value
   pure addr
 
-load' :: Operand -> IRBuilderT ModuleBuilder Operand
+--load' :: (MonadIRBuilder m, MonadModuleBuilder m) => Operand -> m Operand
+load' :: Operand -> CodegenM Operand
 load' addr = load addr 0
 
-store' :: Operand -> Operand -> IRBuilderT ModuleBuilder ()
+store' :: MonadIRBuilder m => Operand -> Operand -> m ()
 store' addr value = store addr 0 value
+
+update :: (Operand -> CodegenM Operand) -> Operand -> CodegenM ()
+update f addr =
+  store' addr =<< f =<< load' addr
 
 whileLoop :: CodegenM Operand -> CodegenM a -> CodegenM ()
 whileLoop condition asm = mdo
@@ -152,3 +129,24 @@ whileLoop condition asm = mdo
   end <- block `named` "while.end"
   pure ()
 
+modifyIndex :: (Operand -> CodegenM Operand) -> CodegenM ()
+modifyIndex f = do
+  idxPtr <- asks index
+  update f idxPtr
+
+readValue :: CodegenM Operand
+readValue = do
+  CompilerState array idxPtr _ <- ask
+  idx <- load' idxPtr
+  valuePtr <- gep array [idx]
+  load' valuePtr
+
+modifyValue :: (Operand -> CodegenM Operand) -> CodegenM ()
+modifyValue f = do
+  CompilerState array idxPtr _ <- ask
+  idx <- load' idxPtr
+  valuePtr <- gep array [idx]
+  update f valuePtr
+
+writeValue :: Operand -> CodegenM ()
+writeValue value = modifyValue (const $ pure value)
