@@ -45,19 +45,21 @@ compile prog = do
       withHostTargetMachine R.PIC C.Default opt $ \tm -> do
         writeLLVMAssemblyToFile (File "bf.ll") mod'
         writeObjectToFile tm (File "bf.o") mod'
+        -- NOTE: still requires linking after this step (e.g.: clang -o bf bf.o)
 
 compileModule :: [Instruction] -> ModuleBuilder ()
 compileModule prog = do
   malloc <- extern "malloc" [i32] (ptr i8)
   free <- extern "free" [ptr i8] void
+  memset <- extern "llvm.memset.p0i8.i64" [ptr i8, i8, i64, i1] void
   putchar <- extern "putchar" [i32] i32
   getchar <- extern "getchar" [] i32
   let exts = Externals putchar getchar
 
-  -- TODO: init array to 0 at beginning?
   function "main" [(i32, "argc"), (ptr (ptr i8), "argv")] i32 $ \[argc, argv] -> mdo
-    memory <- call malloc [(int32 (30000 * 4), [])]
-    -- TODO: memset 0
+    let byteCount = 30000 * 4
+    memory <- call malloc [(int32 byteCount, [])]
+    call memset [(memory, []), (int8 0, []), (int64 byteCount, []), (bit 0, [])]
     array <- memory `bitcast` ptr i32
     idx <- allocate i32 (int32 0)
 
