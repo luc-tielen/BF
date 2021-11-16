@@ -4,7 +4,7 @@ module Main where
 import Lib
 import qualified Text.Megaparsec as P
 import System.Environment
-
+import Data.Text.IO as TIO
 
 main :: IO ()
 main = do
@@ -13,10 +13,10 @@ main = do
 
 handleArgs :: [String] -> IO ()
 handleArgs (filename:_) = do
-  programString <- readFile filename
+  programString <- TIO.readFile filename
   case P.parse parse filename programString of
     Left e -> print e
-    Right instructions -> interpret instructions
+    Right instructions -> compile instructions  -- for interpreter: interpret instructions
 handleArgs _ = do
   progName <- getProgName
   print $ "Usage: " ++ progName ++ " FILENAME"

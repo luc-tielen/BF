@@ -1,51 +1,52 @@
-
 {-#  LANGUAGE GADTs #-}
 
 module BF.Parser ( parse ) where
 
-
-import Text.Megaparsec hiding (parse)
-import Text.Megaparsec.String
-import Text.Megaparsec.Prim hiding (parse)
-import qualified Text.Megaparsec.Lexer as L
+import Data.Void
+import Data.Text (Text)
+import qualified Text.Megaparsec as P
+import qualified Text.Megaparsec.Char as P
+import qualified Text.Megaparsec.Char.Lexer as L
 import Control.Applicative (empty)
 import BF.Types
 
+type ParseErr = Void
+type Parser = P.Parsec ParseErr Text
 
 incrementPtr :: Parser Instruction
-incrementPtr = char '>' >> return IncrementPtr
+incrementPtr = P.char '>' >> return IncrementPtr
 
 decrementPtr :: Parser Instruction
-decrementPtr = char '<' >> return DecrementPtr
+decrementPtr = P.char '<' >> return DecrementPtr
 
 incrementValue :: Parser Instruction
-incrementValue = char '+' >> return IncrementValue
+incrementValue = P.char '+' >> return IncrementValue
 
 decrementValue :: Parser Instruction
-decrementValue = char '-' >> return DecrementValue
+decrementValue = P.char '-' >> return DecrementValue
 
 writeOutput :: Parser Instruction
-writeOutput = char '.' >> return WriteOutput
+writeOutput = P.char '.' >> return WriteOutput
 
 readInput :: Parser Instruction
-readInput = char ',' >> return ReadInput
+readInput = P.char ',' >> return ReadInput
 
 loop :: Parser Instruction
 loop = do
-  char '['
-  instructions <- many instruction
-  char ']'
+  P.char '['
+  instructions <- P.many instruction
+  P.char ']'
   return $ Loop instructions
 
 instruction :: Parser Instruction
 instruction =  incrementPtr
-           <|> decrementPtr
-           <|> incrementValue
-           <|> decrementValue
-           <|> writeOutput
-           <|> readInput
-           <|> loop
+           P.<|> decrementPtr
+           P.<|> incrementValue
+           P.<|> decrementValue
+           P.<|> writeOutput
+           P.<|> readInput
+           P.<|> loop
 
 parse :: Parser [Instruction]
-parse = many instruction
+parse = P.many instruction
 
